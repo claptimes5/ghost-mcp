@@ -13,7 +13,8 @@
         "build": "tsc",
         "start": "node build/server.js",
         "prepare": "npm run build",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "npm run build && node --test \"test/**/*.test.js\"",
+        "pack:mcpb": "scripts/pack-mcpb.sh"
     },
     "publishConfig": {
         "access": "public"
@@ -23,13 +24,13 @@
     "license": "ISC",
     "type": "commonjs",
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.10.1",
-        "@tryghost/admin-api": "^1.13.13",
-        "axios": "^1.8.4",
-        "zod": "^3.24.3"
+        "@modelcontextprotocol/sdk": "^1.32.1",
+        "@tryghost/admin-api": "^1.14.13",
+        "jsonwebtoken": "^9.0.3",
+        "zod": "^3.25.76"
     },
     "devDependencies": {
-        "@types/axios": "^0.9.36",
+        "@types/jsonwebtoken": "^9.0.10",
         "@types/node": "^22.14.1",
         "typescript": "^5.8.3"
     }

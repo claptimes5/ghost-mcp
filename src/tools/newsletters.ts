@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -58,87 +59,57 @@ const deleteParams = {
 
 export function registerNewsletterTools(server: McpServer) {
   // Browse newsletters
-  server.tool(
+  registerTool(
+    server,
     "newsletters_browse",
-    browseParams,
-    async (args, _extra) => {
+    { description: "List newsletters.", inputSchema: browseParams },
+    async (args) => {
       const newsletters = await ghostApiClient.newsletters.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(newsletters, null, 2),
-          },
-        ],
-      };
+      return jsonResult(newsletters);
     }
   );
 
   // Read newsletter
-  server.tool(
+  registerTool(
+    server,
     "newsletters_read",
-    readParams,
-    async (args, _extra) => {
+    { description: "Read a newsletter by id or slug.", inputSchema: readParams },
+    async (args) => {
       const newsletter = await ghostApiClient.newsletters.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(newsletter, null, 2),
-          },
-        ],
-      };
+      return jsonResult(newsletter);
     }
   );
 
   // Add newsletter
-  server.tool(
+  registerTool(
+    server,
     "newsletters_add",
-    addParams,
-    async (args, _extra) => {
+    { description: "Create a newsletter.", inputSchema: addParams },
+    async (args) => {
       const newsletter = await ghostApiClient.newsletters.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(newsletter, null, 2),
-          },
-        ],
-      };
+      return jsonResult(newsletter);
     }
   );
 
   // Edit newsletter
-  server.tool(
+  registerTool(
+    server,
     "newsletters_edit",
-    editParams,
-    async (args, _extra) => {
+    { description: "Update a newsletter.", inputSchema: editParams },
+    async (args) => {
       const newsletter = await ghostApiClient.newsletters.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(newsletter, null, 2),
-          },
-        ],
-      };
+      return jsonResult(newsletter);
     }
   );
 
   // Delete newsletter
-  server.tool(
+  registerTool(
+    server,
     "newsletters_delete",
-    deleteParams,
-    async (args, _extra) => {
+    { description: "Delete a newsletter.", inputSchema: deleteParams },
+    async (args) => {
       await ghostApiClient.newsletters.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Newsletter with id ${args.id} deleted.`,
-          },
-        ],
-      };
+      return textResult(`Newsletter with id ${args.id} deleted.`);
     }
   );
 }

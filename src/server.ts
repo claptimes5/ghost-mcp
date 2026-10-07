@@ -1,65 +1,51 @@
 #!/usr/bin/env node
 
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ghostApiClient } from './ghostApi'; // Import the initialized Ghost API client
-import {
-    handleUserResource,
-    handleMemberResource,
-    handleTierResource,
-    handleOfferResource,
-    handleNewsletterResource,
-    handlePostResource,
-    handleBlogInfoResource
-} from './resources'; // Import resource handlers
+import { registerResources } from './resources';
+import { warnOnRiskyCombination } from './toolPolicy';
+import { registerPrompts } from "./prompts";
+import { registerPostTools } from "./tools/posts";
+import { registerMemberTools } from "./tools/members";
+import { registerUserTools } from "./tools/users";
+import { registerTagTools } from "./tools/tags";
+import { registerTierTools } from "./tools/tiers";
+import { registerOfferTools } from "./tools/offers";
+import { registerNewsletterTools } from "./tools/newsletters";
+import { registerInviteTools } from "./tools/invites";
+import { registerRoleTools } from "./tools/roles";
+import { registerWebhookTools } from "./tools/webhooks";
+
+const { version } = require('../package.json');
 
 // Create an MCP server instance
 const server = new McpServer({
     name: "ghost-mcp-ts",
-    version: "1.0.0", // TODO: Get version from package.json
+    version,
 }, {
     capabilities: {
-        resources: {}, // Capabilities will be enabled as handlers are registered
-        tools: {},
-        prompts: {},
+        // Tool, resource and prompt capabilities are added by the SDK as they're registered,
+        // so a guardrail that removes all prompts doesn't leave an unhandled capability.
         logging: {} // Enable logging capability
     }
 });
 
-// Register resource handlers
-server.resource("user", new ResourceTemplate("user://{user_id}", { list: undefined }), handleUserResource);
-server.resource("member", new ResourceTemplate("member://{member_id}", { list: undefined }), handleMemberResource);
-server.resource("tier", new ResourceTemplate("tier://{tier_id}", { list: undefined }), handleTierResource);
-server.resource("offer", new ResourceTemplate("offer://{offer_id}", { list: undefined }), handleOfferResource);
-server.resource("newsletter", new ResourceTemplate("newsletter://{newsletter_id}", { list: undefined }), handleNewsletterResource);
-server.resource("post", new ResourceTemplate("post://{post_id}", { list: undefined }), handlePostResource);
-server.resource("blog-info", "blog://info", handleBlogInfoResource);
+registerResources(server);
 
-// Register tools
-import { registerPostTools } from "./tools/posts";
-import { registerMemberTools } from "./tools/members";
+// Register tools (each registration is filtered by the guardrails in toolPolicy.ts)
 registerPostTools(server);
 registerMemberTools(server);
-import { registerUserTools } from "./tools/users";
 registerUserTools(server);
-import { registerTagTools } from "./tools/tags";
 registerTagTools(server);
-import { registerTierTools } from "./tools/tiers";
 registerTierTools(server);
-import { registerOfferTools } from "./tools/offers";
 registerOfferTools(server);
-import { registerNewsletterTools } from "./tools/newsletters";
 registerNewsletterTools(server);
-import { registerInviteTools } from "./tools/invites";
 registerInviteTools(server);
-
-import { registerRoleTools } from "./tools/roles";
 registerRoleTools(server);
-import { registerWebhookTools } from "./tools/webhooks";
 registerWebhookTools(server);
 
-import { registerPrompts } from "./prompts";
 registerPrompts(server);
+warnOnRiskyCombination();
 
 // Set up and connect to the standard I/O transport
 async function startServer() {

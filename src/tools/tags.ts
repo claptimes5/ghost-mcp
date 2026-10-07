@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -33,87 +34,57 @@ const deleteParams = {
 
 export function registerTagTools(server: McpServer) {
   // Browse tags
-  server.tool(
+  registerTool(
+    server,
     "tags_browse",
-    browseParams,
-    async (args, _extra) => {
+    { description: "List tags.", inputSchema: browseParams },
+    async (args) => {
       const tags = await ghostApiClient.tags.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tags, null, 2),
-          },
-        ],
-      };
+      return jsonResult(tags);
     }
   );
 
   // Read tag
-  server.tool(
+  registerTool(
+    server,
     "tags_read",
-    readParams,
-    async (args, _extra) => {
+    { description: "Read a tag by id or slug.", inputSchema: readParams },
+    async (args) => {
       const tag = await ghostApiClient.tags.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tag, null, 2),
-          },
-        ],
-      };
+      return jsonResult(tag);
     }
   );
 
   // Add tag
-  server.tool(
+  registerTool(
+    server,
     "tags_add",
-    addParams,
-    async (args, _extra) => {
+    { description: "Create a tag.", inputSchema: addParams },
+    async (args) => {
       const tag = await ghostApiClient.tags.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tag, null, 2),
-          },
-        ],
-      };
+      return jsonResult(tag);
     }
   );
 
   // Edit tag
-  server.tool(
+  registerTool(
+    server,
     "tags_edit",
-    editParams,
-    async (args, _extra) => {
+    { description: "Update a tag.", inputSchema: editParams },
+    async (args) => {
       const tag = await ghostApiClient.tags.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tag, null, 2),
-          },
-        ],
-      };
+      return jsonResult(tag);
     }
   );
 
   // Delete tag
-  server.tool(
+  registerTool(
+    server,
     "tags_delete",
-    deleteParams,
-    async (args, _extra) => {
+    { description: "Permanently delete a tag.", inputSchema: deleteParams },
+    async (args) => {
       await ghostApiClient.tags.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Tag with id ${args.id} deleted.`,
-          },
-        ],
-      };
+      return textResult(`Tag with id ${args.id} deleted.`);
     }
   );
 }

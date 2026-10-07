@@ -1,7 +1,8 @@
 // src/tools/tiers.ts
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ghostApiClient } from "../ghostApi";
+import { tiersApi } from "../ghostApi";
+import { registerTool, jsonResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -9,123 +10,73 @@ const browseParams = {
   limit: z.number().optional(),
   page: z.number().optional(),
   order: z.string().optional(),
-  include: z.string().optional(),
 };
 const readParams = {
-  id: z.string().optional(),
-  slug: z.string().optional(),
-  include: z.string().optional(),
+  id: z.string(),
 };
-const addParams = {
-  name: z.string(),
+const tierMutableFields = {
   description: z.string().optional(),
   welcome_page_url: z.string().optional(),
-  visibility: z.string().optional(),
+  visibility: z.enum(["public", "none"]).optional(),
   monthly_price: z.number().optional(),
   yearly_price: z.number().optional(),
   currency: z.string().optional(),
   benefits: z.array(z.string()).optional(),
-  // Add more fields as needed
+  trial_days: z.number().optional(),
+};
+const addParams = {
+  name: z.string(),
+  ...tierMutableFields,
 };
 const editParams = {
   id: z.string(),
   name: z.string().optional(),
-  description: z.string().optional(),
-  welcome_page_url: z.string().optional(),
-  visibility: z.string().optional(),
-  monthly_price: z.number().optional(),
-  yearly_price: z.number().optional(),
-  currency: z.string().optional(),
-  benefits: z.array(z.string()).optional(),
-  // Add more fields as needed
-};
-const deleteParams = {
-  id: z.string(),
+  active: z.boolean().optional(),
+  ...tierMutableFields,
 };
 
 export function registerTierTools(server: McpServer) {
   // Browse tiers
-  server.tool(
+  registerTool(
+    server,
     "tiers_browse",
-    browseParams,
-    async (args, _extra) => {
-      const tiers = await ghostApiClient.tiers.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tiers, null, 2),
-          },
-        ],
-      };
+    { description: "List membership tiers.", inputSchema: browseParams },
+    async (args) => {
+      const tiers = await tiersApi.browse(args);
+      return jsonResult(tiers);
     }
   );
 
   // Read tier
-  server.tool(
+  registerTool(
+    server,
     "tiers_read",
-    readParams,
-    async (args, _extra) => {
-      const tier = await ghostApiClient.tiers.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tier, null, 2),
-          },
-        ],
-      };
+    { description: "Read a tier by id.", inputSchema: readParams },
+    async (args) => {
+      const tier = await tiersApi.read(args.id);
+      return jsonResult(tier);
     }
   );
 
   // Add tier
-  server.tool(
+  registerTool(
+    server,
     "tiers_add",
-    addParams,
-    async (args, _extra) => {
-      const tier = await ghostApiClient.tiers.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tier, null, 2),
-          },
-        ],
-      };
+    { description: "Create a paid membership tier. Prices are in the smallest currency unit (e.g. cents).", inputSchema: addParams },
+    async (args) => {
+      const tier = await tiersApi.add(args);
+      return jsonResult(tier);
     }
   );
 
-  // Edit tier
-  server.tool(
+  // Edit tier (Ghost has no delete endpoint for tiers; archive with active: false)
+  registerTool(
+    server,
     "tiers_edit",
-    editParams,
-    async (args, _extra) => {
-      const tier = await ghostApiClient.tiers.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(tier, null, 2),
-          },
-        ],
-      };
-    }
-  );
-
-  // Delete tier
-  server.tool(
-    "tiers_delete",
-    deleteParams,
-    async (args, _extra) => {
-      await ghostApiClient.tiers.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Tier with id ${args.id} deleted.`,
-          },
-        ],
-      };
+    { description: "Update a tier. Set active to false to archive it (Ghost does not delete tiers).", inputSchema: editParams },
+    async ({ id, ...tier }) => {
+      const updated = await tiersApi.edit(id, tier);
+      return jsonResult(updated);
     }
   );
 }

@@ -1,52 +1,40 @@
 // src/tools/roles.ts
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ghostApiClient } from "../ghostApi";
+import { rolesApi } from "../ghostApi";
+import { registerTool, jsonResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
-  filter: z.string().optional(),
-  limit: z.number().optional(),
-  page: z.number().optional(),
-  order: z.string().optional(),
+  permissions: z.literal("assign").optional().describe("Only return roles the API key is allowed to assign"),
 };
 const readParams = {
-  id: z.string().optional(),
-  name: z.string().optional(),
+  id: z.string(),
 };
 
 export function registerRoleTools(server: McpServer) {
   // Browse roles
-  server.tool(
+  registerTool(
+    server,
     "roles_browse",
-    browseParams,
-    async (args, _extra) => {
-      const roles = await ghostApiClient.roles.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(roles, null, 2),
-          },
-        ],
-      };
+    { description: "List staff roles and their ids.", inputSchema: browseParams },
+    async (args) => {
+      const roles = await rolesApi.browse(args);
+      return jsonResult(roles);
     }
   );
 
   // Read role
-  server.tool(
+  registerTool(
+    server,
     "roles_read",
-    readParams,
-    async (args, _extra) => {
-      const role = await ghostApiClient.roles.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(role, null, 2),
-          },
-        ],
-      };
+    { description: "Read a staff role by id.", inputSchema: readParams },
+    async (args) => {
+      const role = await rolesApi.read(args.id);
+      if (!role) {
+        throw new Error(`Role with id ${args.id} not found.`);
+      }
+      return jsonResult(role);
     }
   );
 }
