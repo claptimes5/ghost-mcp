@@ -6,12 +6,10 @@ A Model Context Protocol (MCP) server for interacting with Ghost CMS through LLM
 
 ## Features
 
-- Secure Ghost Admin API requests with `@tryghost/admin-api`
-- Comprehensive entity access including posts, users, members, tiers, offers, and newsletters
-- Advanced search functionality with both fuzzy and exact matching options
-- Detailed, human-readable output for Ghost entities
-- Robust error handling using custom `GhostError` exceptions
-- Integrated logging support via MCP context for enhanced troubleshooting
+- Ghost Admin API access via `@tryghost/admin-api`, plus direct calls for tiers, offers, roles and invites
+- Tools for posts, members, users, tags, tiers, offers, newsletters, invites, roles and webhooks
+- Filtering with Ghost's NQL syntax, pagination and ordering
+- Configurable guardrails (read-only mode, tool allowlist, opt-in high-risk capabilities); see [Security](#security)
 
 ## Usage
 
@@ -83,9 +81,9 @@ This MCP server exposes a comprehensive set of tools for managing your Ghost CMS
 
 ### Posts
 - **Browse Posts**: List posts with optional filters, pagination, and ordering.
-- **Read Post**: Retrieve a post by ID or slug.
+- **Read Post**: Retrieve a post by ID or slug, as HTML by default (`formats` can request `lexical` or `plaintext`).
 - **Add Post**: Create a new post with title, content, and status.
-- **Edit Post**: Update an existing post by ID.
+- **Edit Post**: Update an existing post by ID. Requires the post's current `updated_at`, and sending `html` replaces the whole post body.
 - **Delete Post**: Remove a post by ID.
 
 ### Members
@@ -106,8 +104,7 @@ This MCP server exposes a comprehensive set of tools for managing your Ghost CMS
 - **Browse Offers**: List offers.
 - **Read Offer**: Retrieve an offer by ID.
 - **Add Offer**: Create a new offer.
-- **Edit Offer**: Update offer details.
-- **Delete Offer**: Remove an offer.
+- **Edit Offer**: Update offer details. Ghost can't delete offers; set `status` to `archived` instead.
 
 ### Invites
 - **Browse Invites**: List invites.
@@ -129,8 +126,7 @@ This MCP server exposes a comprehensive set of tools for managing your Ghost CMS
 - **Browse Tiers**: List tiers.
 - **Read Tier**: Retrieve a tier by ID.
 - **Add Tier**: Create a new tier.
-- **Edit Tier**: Update tier details.
-- **Delete Tier**: Remove a tier.
+- **Edit Tier**: Update tier details. Ghost can't delete tiers; set `active` to `false` to archive one.
 
 ### Users
 - **Browse Users**: List users.
@@ -147,9 +143,24 @@ Disabled unless `GHOST_MCP_ALLOW` includes `webhooks`.
 > Each tool is accessible via the MCP protocol and can be invoked from compatible clients. For detailed parameter schemas and usage, see the source code in `src/tools/`.
 
 
+## Resources and Prompts
+
+Resources return Ghost data as JSON: `post://{post_id}`, `member://{member_id}`, `user://{user_id}`, `tier://{tier_id}`, `offer://{offer_id}`, `newsletter://{newsletter_id}` and `blog://info`. Each one follows the guardrails of its matching read tool (for example, `member://` is hidden if `members_read` is excluded).
+
+The `summarize-post` prompt builds a summary request from a post's title, excerpt and opening HTML.
+
 ## Error Handling
 
-Ghost MCP Server employs a custom `GhostError` exception to handle API communication errors and processing issues. This ensures clear and descriptive error messages to assist with troubleshooting.
+Errors from the Ghost API are returned as MCP tool errors carrying Ghost's error type and message (for example `NotFoundError: Tier not found.`).
+
+## Development
+
+```bash
+npm install
+npm test
+```
+
+`npm test` builds the server and runs end-to-end tests in `test/` against a mock Ghost Admin API.
 
 ## Contributing
 
