@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { isAllowed } from "../config";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -18,7 +19,8 @@ const readParams = {
 const editParams = {
   id: z.string(),
   name: z.string().optional(),
-  email: z.string().optional(),
+  // Changing a staff email lets the new address trigger a password reset, so it's opt-in.
+  ...(isAllowed("staff_email") ? { email: z.string().optional() } : {}),
   slug: z.string().optional(),
   bio: z.string().optional(),
   website: z.string().optional(),

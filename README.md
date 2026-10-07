@@ -15,22 +15,52 @@ A Model Context Protocol (MCP) server for interacting with Ghost CMS through LLM
 
 ## Usage
 
-To use this with MCP clients, for instance, Claude Desktop, add the following to your `claude_desktop_config.json`:
+Build the server from a local clone of this repository:
+
+```bash
+git clone https://github.com/claptimes5/ghost-mcp.git
+cd ghost-mcp
+npm install
+```
+
+Then add it to your MCP client config, for instance Claude Desktop's `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
       "ghost-mcp": {
-        "command": "npx",
-        "args": ["-y", "@fanyangmeng/ghost-mcp"],
+        "command": "node",
+        "args": ["/absolute/path/to/ghost-mcp/build/server.js"],
         "env": {
             "GHOST_API_URL": "https://yourblog.com",
             "GHOST_ADMIN_API_KEY": "your_admin_api_key",
-            "GHOST_API_VERSION": "v5.0"
+            "GHOST_API_VERSION": "v5.0",
+            "GHOST_MCP_READ_ONLY": "true"
         }
       }
     }
 }
 ```
+
+> Running `npx @fanyangmeng/ghost-mcp` installs the upstream npm package, not this fork, and gives the upstream publisher code execution with your Admin API key. Run a local build (or a pinned commit) instead.
+
+## Security
+
+A Ghost Admin API key has full administrator rights and can't be scoped down. Anything the LLM reads (post content, member names and notes) could contain instructions planted by a third party, so this server limits what the LLM can do with the key:
+
+| Variable | Effect |
+| --- | --- |
+| `GHOST_MCP_READ_ONLY=true` | Only expose browse/read tools. Recommended unless you need the LLM to make changes. |
+| `GHOST_MCP_TOOLS=posts_browse,posts_add,...` | Allowlist; every tool not listed is removed. |
+| `GHOST_MCP_ALLOW=...` | Comma-separated list of high-risk capabilities to enable (all off by default). |
+
+`GHOST_MCP_ALLOW` options:
+
+- `webhooks`: the `webhooks_*` tools. A webhook can send member data to any URL.
+- `code_injection`: `codeinjection_head`/`codeinjection_foot` on posts, which put arbitrary scripts on your public site.
+- `privileged_invites`: invites for roles above Editor (e.g. Administrator). Without it, only Contributor, Author and Editor invites are allowed.
+- `staff_email`: changing a staff user's email with `users_edit`, which would let the new address reset that user's password.
+
+Every tool also carries MCP annotations (`readOnlyHint`, `destructiveHint`), so clients can ask for confirmation before edits and deletes.
 
 ## Available Resources
 
@@ -109,8 +139,9 @@ This MCP server exposes a comprehensive set of tools for managing your Ghost CMS
 - **Delete User**: Remove a user.
 
 ### Webhooks
-- **Browse Webhooks**: List webhooks.
+Disabled unless `GHOST_MCP_ALLOW` includes `webhooks`.
 - **Add Webhook**: Create a new webhook.
+- **Edit Webhook**: Update a webhook.
 - **Delete Webhook**: Remove a webhook.
 
 > Each tool is accessible via the MCP protocol and can be invoked from compatible clients. For detailed parameter schemas and usage, see the source code in `src/tools/`.

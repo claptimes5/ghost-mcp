@@ -2,6 +2,11 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { isAllowed } from "../config";
+
+// Roles the LLM may invite people into. Anything else (Administrator, Super Editor,
+// roles added in future Ghost versions) needs GHOST_MCP_ALLOW=privileged_invites.
+const UNPRIVILEGED_ROLES = ["Contributor", "Author", "Editor"];
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -41,6 +46,14 @@ export function registerInviteTools(server: McpServer) {
     "invites_add",
     addParams,
     async (args, _extra) => {
+      if (!isAllowed("privileged_invites")) {
+        const role = await ghostApiClient.roles.read({ id: args.role_id });
+        if (!UNPRIVILEGED_ROLES.includes(role.name)) {
+          throw new Error(
+            `Inviting users with the "${role.name}" role is disabled. Allowed roles: ${UNPRIVILEGED_ROLES.join(", ")}.`
+          );
+        }
+      }
       const invite = await ghostApiClient.invites.add(args);
       return {
         content: [

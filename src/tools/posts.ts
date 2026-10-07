@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { isAllowed } from "../config";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
@@ -54,11 +55,16 @@ const postMutableFields = {
   twitter_title: z.string().optional(),
   twitter_description: z.string().optional(),
   twitter_image: z.string().optional(),
-  codeinjection_head: z.string().optional(),
-  codeinjection_foot: z.string().optional(),
   canonical_url: z.string().optional(),
   tags: z.array(tagRef).optional(),
   authors: z.array(authorRef).optional(),
+  // Injects raw HTML/JS into the public site, so only exposed when explicitly allowed.
+  ...(isAllowed("code_injection")
+    ? {
+        codeinjection_head: z.string().optional(),
+        codeinjection_foot: z.string().optional(),
+      }
+    : {}),
 };
 const addParams = {
   title: z.string(),

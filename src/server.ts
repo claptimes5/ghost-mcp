@@ -12,11 +12,14 @@ import {
     handlePostResource,
     handleBlogInfoResource
 } from './resources'; // Import resource handlers
+import { applyToolPolicy } from './toolPolicy';
+
+const { version } = require('../package.json');
 
 // Create an MCP server instance
 const server = new McpServer({
     name: "ghost-mcp-ts",
-    version: "1.0.0", // TODO: Get version from package.json
+    version,
 }, {
     capabilities: {
         resources: {}, // Capabilities will be enabled as handlers are registered
@@ -35,7 +38,8 @@ server.resource("newsletter", new ResourceTemplate("newsletter://{newsletter_id}
 server.resource("post", new ResourceTemplate("post://{post_id}", { list: undefined }), handlePostResource);
 server.resource("blog-info", "blog://info", handleBlogInfoResource);
 
-// Register tools
+// Register tools (the policy must be applied before any tool is registered)
+applyToolPolicy(server);
 import { registerPostTools } from "./tools/posts";
 import { registerMemberTools } from "./tools/members";
 registerPostTools(server);
