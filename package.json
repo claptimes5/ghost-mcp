@@ -13,7 +13,7 @@
         "build": "tsc",
         "start": "node build/server.js",
         "prepare": "npm run build",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "npm run build && node --test \"test/**/*.test.js\""
     },
     "publishConfig": {
         "access": "public"
@@ -25,9 +25,11 @@
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.32.1",
         "@tryghost/admin-api": "^1.14.13",
+        "jsonwebtoken": "^9.0.3",
         "zod": "^3.25.76"
     },
     "devDependencies": {
+        "@types/jsonwebtoken": "^9.0.10",
         "@types/node": "^22.14.1",
         "typescript": "^5.8.3"
     }

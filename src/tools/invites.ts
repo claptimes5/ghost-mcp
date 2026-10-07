@@ -1,7 +1,8 @@
 // src/tools/invites.ts
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ghostApiClient } from "../ghostApi";
+import { invitesApi, rolesApi } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 import { isAllowed } from "../config";
 
 // Roles the LLM may invite people into. Anything else (Administrator, Super Editor,
@@ -25,61 +26,43 @@ const deleteParams = {
 
 export function registerInviteTools(server: McpServer) {
   // Browse invites
-  server.tool(
+  registerTool(
+    server,
     "invites_browse",
-    browseParams,
-    async (args, _extra) => {
-      const invites = await ghostApiClient.invites.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(invites, null, 2),
-          },
-        ],
-      };
+    { description: "List pending staff invites.", inputSchema: browseParams },
+    async (args) => {
+      const invites = await invitesApi.browse(args);
+      return jsonResult(invites);
     }
   );
 
   // Add invite
-  server.tool(
+  registerTool(
+    server,
     "invites_add",
-    addParams,
-    async (args, _extra) => {
+    { description: "Invite a new staff user by email with the given role_id (see roles_browse).", inputSchema: addParams },
+    async (args) => {
       if (!isAllowed("privileged_invites")) {
-        const role = await ghostApiClient.roles.read({ id: args.role_id });
-        if (!UNPRIVILEGED_ROLES.includes(role.name)) {
+        const role = await rolesApi.read(args.role_id);
+        if (!role || !UNPRIVILEGED_ROLES.includes(role.name)) {
           throw new Error(
-            `Inviting users with the "${role.name}" role is disabled. Allowed roles: ${UNPRIVILEGED_ROLES.join(", ")}.`
+            `Inviting users with the "${role?.name ?? args.role_id}" role is disabled. Allowed roles: ${UNPRIVILEGED_ROLES.join(", ")}.`
           );
         }
       }
-      const invite = await ghostApiClient.invites.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(invite, null, 2),
-          },
-        ],
-      };
+      const invite = await invitesApi.add(args);
+      return jsonResult(invite);
     }
   );
 
   // Delete invite
-  server.tool(
+  registerTool(
+    server,
     "invites_delete",
-    deleteParams,
-    async (args, _extra) => {
-      await ghostApiClient.invites.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Invite with id ${args.id} deleted.`,
-          },
-        ],
-      };
+    { description: "Revoke a pending staff invite.", inputSchema: deleteParams },
+    async (args) => {
+      await invitesApi.delete(args.id);
+      return textResult(`Invite with id ${args.id} deleted.`);
     }
   );
 }

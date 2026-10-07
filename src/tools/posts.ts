@@ -2,18 +2,25 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 import { isAllowed } from "../config";
 
 // Parameter schemas as ZodRawShape (object literals)
+const formats = z
+  .string()
+  .optional()
+  .describe("Comma-separated content formats to return: html, lexical, plaintext");
 const browseParams = {
   filter: z.string().optional(),
   limit: z.number().optional(),
   page: z.number().optional(),
   order: z.string().optional(),
+  formats,
 };
 const readParams = {
   id: z.string().optional(),
   slug: z.string().optional(),
+  formats,
 };
 // Shared mutable post fields — accepted by both posts_add and posts_edit.
 // Mirrors the Ghost Admin API post resource:
@@ -82,91 +89,62 @@ const deleteParams = {
 
 export function registerPostTools(server: McpServer) {
   // Browse posts
-  server.tool(
+  registerTool(
+    server,
     "posts_browse",
-    browseParams,
-    async (args, _extra) => {
+    { description: "List posts. Supports Ghost NQL filters (e.g. \"status:draft\"), pagination and ordering. Use formats to choose content formats (html, lexical, plaintext).", inputSchema: browseParams },
+    async (args) => {
       const posts = await ghostApiClient.posts.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(posts, null, 2),
-          },
-        ],
-      };
+      return jsonResult(posts);
     }
   );
 
   // Read post
-  server.tool(
+  registerTool(
+    server,
     "posts_read",
-    readParams,
-    async (args, _extra) => {
-      const post = await ghostApiClient.posts.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(post, null, 2),
-          },
-        ],
-      };
+    { description: "Read a single post by id or slug. Returns html by default; pass formats to request lexical or plaintext.", inputSchema: readParams },
+    async (args) => {
+      const { formats = "html", ...identifier } = args;
+      const post = await ghostApiClient.posts.read(identifier, { formats });
+      return jsonResult(post);
     }
   );
 
   // Add post
-  server.tool(
+  registerTool(
+    server,
     "posts_add",
-    addParams,
-    async (args, _extra) => {
+    { description: "Create a post. Provide content as html (converted by Ghost) or lexical JSON. Status defaults to draft.", inputSchema: addParams },
+    async (args) => {
       // If html is present, use source: "html" to ensure Ghost uses the html content
       const options = args.html ? { source: "html" } : undefined;
       const post = await ghostApiClient.posts.add(args, options);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(post, null, 2),
-          },
-        ],
-      };
+      return jsonResult(post);
     }
   );
 
   // Edit post
-  server.tool(
+  registerTool(
+    server,
     "posts_edit",
-    editParams,
-    async (args, _extra) => {
+    { description: "Update a post. Requires the current updated_at from posts_read (Ghost rejects stale edits). Sending html replaces the whole post body.", inputSchema: editParams },
+    async (args) => {
       // If html is present, use source: "html" to ensure Ghost uses the html content for updates
       const options = args.html ? { source: "html" } : undefined;
       const post = await ghostApiClient.posts.edit(args, options);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(post, null, 2),
-          },
-        ],
-      };
+      return jsonResult(post);
     }
   );
 
   // Delete post
-  server.tool(
+  registerTool(
+    server,
     "posts_delete",
-    deleteParams,
-    async (args, _extra) => {
+    { description: "Permanently delete a post.", inputSchema: deleteParams },
+    async (args) => {
       await ghostApiClient.posts.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Post with id ${args.id} deleted.`,
-          },
-        ],
-      };
+      return textResult(`Post with id ${args.id} deleted.`);
     }
   );
 }

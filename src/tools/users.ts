@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 import { isAllowed } from "../config";
 
 // Parameter schemas as ZodRawShape (object literals)
@@ -35,70 +36,46 @@ const deleteParams = {
 
 export function registerUserTools(server: McpServer) {
   // Browse users
-  server.tool(
+  registerTool(
+    server,
     "users_browse",
-    browseParams,
-    async (args, _extra) => {
+    { description: "List staff users.", inputSchema: browseParams },
+    async (args) => {
       const users = await ghostApiClient.users.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(users, null, 2),
-          },
-        ],
-      };
+      return jsonResult(users);
     }
   );
 
   // Read user
-  server.tool(
+  registerTool(
+    server,
     "users_read",
-    readParams,
-    async (args, _extra) => {
+    { description: "Read a staff user by id, email or slug.", inputSchema: readParams },
+    async (args) => {
       const user = await ghostApiClient.users.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(user, null, 2),
-          },
-        ],
-      };
+      return jsonResult(user);
     }
   );
 
   // Edit user
-  server.tool(
+  registerTool(
+    server,
     "users_edit",
-    editParams,
-    async (args, _extra) => {
+    { description: "Update a staff user's profile.", inputSchema: editParams },
+    async (args) => {
       const user = await ghostApiClient.users.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(user, null, 2),
-          },
-        ],
-      };
+      return jsonResult(user);
     }
   );
 
   // Delete user
-  server.tool(
+  registerTool(
+    server,
     "users_delete",
-    deleteParams,
-    async (args, _extra) => {
+    { description: "Permanently delete a staff user.", inputSchema: deleteParams },
+    async (args) => {
       await ghostApiClient.users.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `User with id ${args.id} deleted.`,
-          },
-        ],
-      };
+      return textResult(`User with id ${args.id} deleted.`);
     }
   );
 }

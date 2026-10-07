@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ghostApiClient } from "../ghostApi";
+import { registerTool, jsonResult, textResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const addParams = {
@@ -25,53 +26,35 @@ const deleteParams = {
 
 export function registerWebhookTools(server: McpServer) {
   // Add webhook
-  server.tool(
+  registerTool(
+    server,
     "webhooks_add",
-    addParams,
-    async (args, _extra) => {
+    { description: "Create a webhook that POSTs to target_url when the event fires.", inputSchema: addParams },
+    async (args) => {
       const webhook = await ghostApiClient.webhooks.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(webhook, null, 2),
-          },
-        ],
-      };
+      return jsonResult(webhook);
     }
   );
 
   // Edit webhook
-  server.tool(
+  registerTool(
+    server,
     "webhooks_edit",
-    editParams,
-    async (args, _extra) => {
+    { description: "Update a webhook.", inputSchema: editParams },
+    async (args) => {
       const webhook = await ghostApiClient.webhooks.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(webhook, null, 2),
-          },
-        ],
-      };
+      return jsonResult(webhook);
     }
   );
 
   // Delete webhook
-  server.tool(
+  registerTool(
+    server,
     "webhooks_delete",
-    deleteParams,
-    async (args, _extra) => {
+    { description: "Delete a webhook.", inputSchema: deleteParams },
+    async (args) => {
       await ghostApiClient.webhooks.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Webhook with id ${args.id} deleted.`,
-          },
-        ],
-      };
+      return textResult(`Webhook with id ${args.id} deleted.`);
     }
   );
 }

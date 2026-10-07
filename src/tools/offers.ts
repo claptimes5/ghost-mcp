@@ -1,32 +1,28 @@
 // src/tools/offers.ts
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ghostApiClient } from "../ghostApi";
+import { offersApi } from "../ghostApi";
+import { registerTool, jsonResult } from "../toolPolicy";
 
 // Parameter schemas as ZodRawShape (object literals)
 const browseParams = {
   filter: z.string().optional(),
-  limit: z.number().optional(),
-  page: z.number().optional(),
-  order: z.string().optional(),
 };
 const readParams = {
-  id: z.string().optional(),
-  code: z.string().optional(),
+  id: z.string(),
 };
 const addParams = {
   name: z.string(),
   code: z.string(),
-  cadence: z.string(),
-  duration: z.string(),
-  amount: z.number(),
+  type: z.enum(["percent", "fixed", "trial"]),
+  cadence: z.enum(["month", "year"]),
+  duration: z.enum(["once", "repeating", "forever", "trial"]),
+  amount: z.number().describe("Percent off, fixed amount in the smallest currency unit, or trial length in days"),
   tier_id: z.string(),
-  type: z.string(),
   display_title: z.string().optional(),
   display_description: z.string().optional(),
-  duration_in_months: z.number().optional(),
-  currency: z.string().optional(),
-  // Add more fields as needed
+  duration_in_months: z.number().optional().describe("Required when duration is repeating"),
+  currency: z.string().optional().describe("Required when type is fixed"),
 };
 const editParams = {
   id: z.string(),
@@ -34,95 +30,53 @@ const editParams = {
   code: z.string().optional(),
   display_title: z.string().optional(),
   display_description: z.string().optional(),
+  status: z.enum(["active", "archived"]).optional(),
   // Only a subset of fields are editable per Ghost API docs
-};
-const deleteParams = {
-  id: z.string(),
 };
 
 export function registerOfferTools(server: McpServer) {
   // Browse offers
-  server.tool(
+  registerTool(
+    server,
     "offers_browse",
-    browseParams,
-    async (args, _extra) => {
-      const offers = await ghostApiClient.offers.browse(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(offers, null, 2),
-          },
-        ],
-      };
+    { description: "List offers.", inputSchema: browseParams },
+    async (args) => {
+      const offers = await offersApi.browse(args);
+      return jsonResult(offers);
     }
   );
 
   // Read offer
-  server.tool(
+  registerTool(
+    server,
     "offers_read",
-    readParams,
-    async (args, _extra) => {
-      const offer = await ghostApiClient.offers.read(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(offer, null, 2),
-          },
-        ],
-      };
+    { description: "Read an offer by id.", inputSchema: readParams },
+    async (args) => {
+      const offer = await offersApi.read(args.id);
+      return jsonResult(offer);
     }
   );
 
   // Add offer
-  server.tool(
+  registerTool(
+    server,
     "offers_add",
-    addParams,
-    async (args, _extra) => {
-      const offer = await ghostApiClient.offers.add(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(offer, null, 2),
-          },
-        ],
-      };
+    { description: "Create an offer (discount or free trial) for a tier.", inputSchema: addParams },
+    async ({ tier_id, ...offer }) => {
+      // Ghost references the tier as an object rather than an id field
+      const created = await offersApi.add({ ...offer, tier: { id: tier_id } });
+      return jsonResult(created);
     }
   );
 
-  // Edit offer
-  server.tool(
+  // Edit offer (Ghost has no delete endpoint for offers; archive with status: "archived")
+  registerTool(
+    server,
     "offers_edit",
-    editParams,
-    async (args, _extra) => {
-      const offer = await ghostApiClient.offers.edit(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(offer, null, 2),
-          },
-        ],
-      };
-    }
-  );
-
-  // Delete offer
-  server.tool(
-    "offers_delete",
-    deleteParams,
-    async (args, _extra) => {
-      await ghostApiClient.offers.delete(args);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Offer with id ${args.id} deleted.`,
-          },
-        ],
-      };
+    { description: "Update an offer. Set status to \"archived\" to archive it (Ghost does not delete offers).", inputSchema: editParams },
+    async ({ id, ...offer }) => {
+      const updated = await offersApi.edit(id, offer);
+      return jsonResult(updated);
     }
   );
 }
