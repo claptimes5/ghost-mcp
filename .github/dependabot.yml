@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  - package-ecosystem: npm  # also covers pnpm-lock.yaml
     directory: /
     schedule:
       interval: weekly

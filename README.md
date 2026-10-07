@@ -50,14 +50,14 @@ Build it from a local clone of this repository:
 ```bash
 git clone https://github.com/claptimes5/ghost-mcp.git
 cd ghost-mcp
-npm install
+pnpm install
 ```
 
 > Running `npx @fanyangmeng/ghost-mcp` installs the upstream npm package, not this fork, and gives the upstream publisher code execution with your Ghost credential. Run a local build instead.
 
 ### 3. Connect your MCP client
 
-**Claude Desktop.** Run `npm run pack:mcpb` and open `dist/ghost-mcp.mcpb` to install it as an extension. Desktop asks for your settings and keeps the token in your OS keychain rather than a config file.
+**Claude Desktop.** Run `pnpm pack:mcpb` and open `dist/ghost-mcp.mcpb` to install it as an extension. Desktop asks for your settings and keeps the token in your OS keychain rather than a config file.
 
 **Claude Code.** Keep the token in a password manager and give the server a command that prints it, so it never appears in your config:
 
@@ -222,11 +222,11 @@ Errors from the Ghost API are returned as MCP tool errors carrying Ghost's error
 ## Development
 
 ```bash
-npm install
-npm test
+pnpm install
+pnpm test
 ```
 
-`npm test` builds the server and runs end-to-end tests in `test/` against a mock Ghost Admin API. `npm run pack:mcpb` builds the Claude Desktop extension in `dist/`; keep the `version` in `manifest.json` in step with `package.json`.
+`pnpm test` builds the server and runs end-to-end tests in `test/` against a mock Ghost Admin API. `pnpm pack:mcpb` builds the Claude Desktop extension in `dist/`; keep the `version` in `manifest.json` in step with `package.json`.
 
 ## Contributing
 

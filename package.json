@@ -12,10 +12,11 @@
     "scripts": {
         "build": "tsc",
         "start": "node build/server.js",
-        "prepare": "npm run build",
-        "test": "npm run build && node --test \"test/**/*.test.js\"",
+        "prepare": "pnpm run build",
+        "test": "pnpm run build && node --test \"test/**/*.test.js\"",
         "pack:mcpb": "scripts/pack-mcpb.sh"
     },
+    "packageManager": "pnpm@11.1.1",
     "publishConfig": {
         "access": "public"
     },

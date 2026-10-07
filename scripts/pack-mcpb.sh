@@ -3,9 +3,9 @@
 # settings (the API key) in the OS keychain instead of a plain-text config file.
 set -euo pipefail
 
-# Pinned, and run with npx rather than installed: the CLI's own dependencies have open
+# Pinned, and run with pnpm dlx rather than installed: the CLI's own dependencies have open
 # advisories (in signing and interactive prompts, neither used here) that would otherwise
-# show up in this project's npm audit.
+# show up in this project's pnpm audit.
 MCPB="@anthropic-ai/mcpb@2.1.2"
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,12 +18,13 @@ if [[ "$package_version" != "$manifest_version" ]]; then
     exit 1
 fi
 
-npm run build
+pnpm run build
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
-cp -r build package.json package-lock.json manifest.json LICENSE "$stage/"
-(cd "$stage" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+cp -r build package.json pnpm-lock.yaml manifest.json LICENSE "$stage/"
+# Hoisted: a flat node_modules with no symlinks into a store, so the bundle is self-contained.
+(cd "$stage" && pnpm install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted)
 
 mkdir -p dist
-npx --yes "$MCPB" pack "$stage" dist/ghost-mcp.mcpb
+pnpm dlx "$MCPB" pack "$stage" dist/ghost-mcp.mcpb
