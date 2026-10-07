@@ -15,6 +15,7 @@ import { registerNewsletterTools } from "./tools/newsletters";
 import { registerInviteTools } from "./tools/invites";
 import { registerRoleTools } from "./tools/roles";
 import { registerWebhookTools } from "./tools/webhooks";
+import { registerImageTools } from "./tools/images";
 
 const { version } = require('../package.json');
 
@@ -43,6 +44,7 @@ registerNewsletterTools(server);
 registerInviteTools(server);
 registerRoleTools(server);
 registerWebhookTools(server);
+registerImageTools(server);
 
 registerPrompts(server);
 warnOnRiskyCombination();

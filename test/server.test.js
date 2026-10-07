@@ -25,9 +25,13 @@ const ghost = http.createServer((req, res) => {
     req.on('data', chunk => { raw += chunk; });
     req.on('end', () => {
         const url = new URL(req.url, 'http://ghost');
-        const body = raw ? JSON.parse(raw) : undefined;
+        const body = raw && req.headers['content-type'] === 'application/json' ? JSON.parse(raw) : raw || undefined;
         requests.push({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, headers: req.headers });
         const send = (status, data) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(data)); };
+
+        // Public files for images_upload to download; served without auth like any website.
+        if (url.pathname === '/photo.jpg') { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end('JPEGDATA'); }
+        if (url.pathname === '/page.html') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<p>hi</p>'); }
 
         try {
             const token = (req.headers.authorization ?? '').replace(/^Ghost /, '');
@@ -47,6 +51,7 @@ const ghost = http.createServer((req, res) => {
         if (p.startsWith('tiers/') && req.method === 'PUT') return send(200, { tiers: [body.tiers[0]] });
         if (p === 'offers/' && req.method === 'POST') return send(201, { offers: [body.offers[0]] });
         if (p.startsWith('posts/')) return send(200, { posts: [{ id: 'p1', title: 'Hello', html: '<p>Body</p>', updated_at: 'u1' }] });
+        if (p === 'images/upload/') return send(201, { images: [{ url: 'https://blog.example/content/images/shop.jpg' }] });
         if (p === 'site/') return send(200, { site: { title: 'Test Blog' } });
         send(404, { errors: [{ type: 'NotFoundError', message: `No mock for ${req.method} ${p}` }] });
     });
@@ -83,7 +88,7 @@ describe('guardrails', () => {
     test('defaults hide webhooks, code injection and staff email changes', () => withClient({}, async client => {
         const { tools } = await client.listTools();
         const names = tools.map(t => t.name);
-        assert.equal(names.length, 37);
+        assert.equal(names.length, 38);
         assert.ok(!names.some(n => n.startsWith('webhooks_')));
         const props = name => Object.keys(tools.find(t => t.name === name).inputSchema.properties);
         assert.ok(!props('posts_edit').includes('codeinjection_head'));
@@ -116,7 +121,7 @@ describe('guardrails', () => {
 
     test('GHOST_MCP_ALLOW enables the high-risk capabilities', () => withClient({ GHOST_MCP_ALLOW: 'webhooks,code_injection,privileged_invites,staff_email' }, async client => {
         const { tools } = await client.listTools();
-        assert.equal(tools.length, 40);
+        assert.equal(tools.length, 41);
         const props = name => Object.keys(tools.find(t => t.name === name).inputSchema.properties);
         assert.ok(props('posts_edit').includes('codeinjection_head'));
         assert.ok(props('users_edit').includes('email'));
@@ -212,6 +217,25 @@ describe('posts, resources and prompts', () => {
     }));
 });
 
+describe('images', () => {
+    test('images_upload copies a remote image into Ghost', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'images_upload', { url: `${ghostUrl}/photo.jpg`, name: 'My Shop!' });
+        assert.equal(resultJson(result).url, 'https://blog.example/content/images/shop.jpg');
+        const upload = requests.find(r => r.path === '/ghost/api/admin/images/upload/');
+        assert.match(upload.headers['content-type'], /^multipart\/form-data/);
+        assert.match(upload.body, /filename="My-Shop-\.jpg"/);
+        assert.match(upload.body, /JPEGDATA/);
+    }));
+
+    test('images_upload rejects non-images without calling Ghost', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'images_upload', { url: `${ghostUrl}/page.html` });
+        assert.equal(result.isError, true);
+        assert.ok(!requests.some(r => r.path.includes('images/upload')));
+    }));
+});
+
 describe('confirmation for deletes', () => {
     test('a declined confirmation cancels the delete', () => withClient({}, async client => {
         requests = [];
@@ -266,7 +290,7 @@ describe('configuration', () => {
 
     test('unfilled .mcpb placeholders are treated as unset', () => withClient(
         { GHOST_MCP_TOOLS: '${user_config.tools}', GHOST_MCP_READ_ONLY: '${user_config.read_only}' },
-        async client => assert.equal((await toolNames(client)).length, 37)
+        async client => assert.equal((await toolNames(client)).length, 38)
     ));
 
     test('warns when member data and public writes are both enabled', async () => {

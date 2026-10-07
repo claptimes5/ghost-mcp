@@ -181,6 +181,10 @@ This MCP server exposes a comprehensive set of tools for managing your Ghost CMS
 - **Browse Roles**: List roles.
 - **Read Role**: Retrieve a role by ID.
 
+### Images
+
+- **Upload Image**: Download an image from an http(s) URL and store it in Ghost, returning the Ghost-hosted URL. Local file paths aren't accepted, so content can't be copied from your machine onto the site.
+
 ### Tags
 - **Browse Tags**: List tags.
 - **Read Tag**: Retrieve a tag by ID or slug.
