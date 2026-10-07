@@ -13,7 +13,18 @@ A Model Context Protocol (MCP) server for interacting with Ghost CMS through LLM
 
 ## Usage
 
-Build the server from a local clone of this repository:
+### 1. Create a limited Ghost credential
+
+A Ghost Admin API key from a custom integration has full administrator rights, so prefer a **staff access token**: it signs requests the same way, but Ghost limits it to that staff user's role.
+
+1. In Ghost Admin, go to **Settings → Staff** and invite a user for the AI with the least powerful role that fits. To edit any post, that's **Editor**, which can't access members, site settings or integrations. Authors can only edit their own posts, and Contributors only their own drafts.
+2. Sign in as that user, open their profile and copy the **Staff access token**.
+
+The guardrails below still apply on top of the role, but the role is what Ghost itself enforces.
+
+### 2. Install the server
+
+Build it from a local clone of this repository:
 
 ```bash
 git clone https://github.com/claptimes5/ghost-mcp.git
@@ -21,7 +32,25 @@ cd ghost-mcp
 npm install
 ```
 
-Then add it to your MCP client config, for instance Claude Desktop's `claude_desktop_config.json`:
+> Running `npx @fanyangmeng/ghost-mcp` installs the upstream npm package, not this fork, and gives the upstream publisher code execution with your Ghost credential. Run a local build instead.
+
+### 3. Connect your MCP client
+
+**Claude Desktop.** Run `npm run pack:mcpb` and open `dist/ghost-mcp.mcpb` to install it as an extension. Desktop asks for your settings and keeps the token in your OS keychain rather than a config file.
+
+**Claude Code.** Keep the token in a password manager and give the server a command that prints it, so it never appears in your config:
+
+```bash
+claude mcp add ghost --scope user \
+  -e GHOST_API_URL=https://yourblog.com \
+  -e GHOST_ADMIN_API_KEY_COMMAND="pass show ghost/staff-token" \
+  -e GHOST_MCP_TOOLS=posts_browse,posts_read,posts_edit \
+  -- node /absolute/path/to/ghost-mcp/build/server.js
+```
+
+`GHOST_ADMIN_API_KEY_COMMAND` runs through your shell, so any secret store with a CLI works, for example `op read "op://Private/Ghost/credential"` (1Password), `security find-generic-password -s ghost-mcp -w` (macOS Keychain) or `secret-tool lookup service ghost-mcp` (GNOME Keyring).
+
+**Other clients.** Add the server to the client's MCP config, for example:
 ```json
 {
   "mcpServers": {
@@ -30,8 +59,7 @@ Then add it to your MCP client config, for instance Claude Desktop's `claude_des
         "args": ["/absolute/path/to/ghost-mcp/build/server.js"],
         "env": {
             "GHOST_API_URL": "https://yourblog.com",
-            "GHOST_ADMIN_API_KEY": "your_admin_api_key",
-            "GHOST_API_VERSION": "v5.0",
+            "GHOST_ADMIN_API_KEY_COMMAND": "pass show ghost/staff-token",
             "GHOST_MCP_READ_ONLY": "true"
         }
       }
@@ -39,26 +67,33 @@ Then add it to your MCP client config, for instance Claude Desktop's `claude_des
 }
 ```
 
-> Running `npx @fanyangmeng/ghost-mcp` installs the upstream npm package, not this fork, and gives the upstream publisher code execution with your Admin API key. Run a local build (or a pinned commit) instead.
+`GHOST_ADMIN_API_KEY` can hold the token directly instead, but then it sits in plain text in that file. `GHOST_API_VERSION` defaults to `v5.0`.
 
 ## Security
 
-A Ghost Admin API key has full administrator rights and can't be scoped down. Anything the LLM reads (post content, member names and notes) could contain instructions planted by a third party, so this server limits what the LLM can do with the key:
+Anything the AI reads (post content, member names and notes) could contain instructions planted by a third party. No MCP server can fully prevent that, so this one limits what those instructions could do.
 
 | Variable | Effect |
 | --- | --- |
-| `GHOST_MCP_READ_ONLY=true` | Only expose browse/read tools. Recommended unless you need the LLM to make changes. |
-| `GHOST_MCP_TOOLS=posts_browse,posts_add,...` | Allowlist; every tool not listed is removed. |
+| `GHOST_MCP_READ_ONLY=true` | Only expose browse/read tools. |
+| `GHOST_MCP_TOOLS=posts_browse,posts_read,...` | Allowlist; every tool not listed is removed, along with its resources and prompts. |
 | `GHOST_MCP_ALLOW=...` | Comma-separated list of high-risk capabilities to enable (all off by default). |
 
 `GHOST_MCP_ALLOW` options:
 
+- `publish`: setting a post's status to `published` or `scheduled`. Without it, the AI can only save drafts, and you publish from Ghost Admin. Edits to posts that are already published still go live immediately.
 - `webhooks`: the `webhooks_*` tools. A webhook can send member data to any URL.
 - `code_injection`: `codeinjection_head`/`codeinjection_foot` on posts, which put arbitrary scripts on your public site.
 - `privileged_invites`: invites for roles above Editor (e.g. Administrator). Without it, only Contributor, Author and Editor invites are allowed.
 - `staff_email`: changing a staff user's email with `users_edit`, which would let the new address reset that user's password.
 
-Every tool also carries MCP annotations (`readOnlyHint`, `destructiveHint`), so clients can ask for confirmation before edits and deletes.
+The server also:
+
+- **Asks before deleting.** Delete tools ask the person to confirm through MCP elicitation. This is enforced by the server, not the AI. Clients without elicitation support fall back to their own tool-approval prompt, so keep approvals on for this server rather than auto-approving its tools.
+- **Warns about risky combinations.** If member data and tools that write public content are enabled together, it logs a warning at startup. That pairing lets injected instructions copy member data into something public. Use separate, narrower server instances instead.
+- **Labels every tool** with MCP annotations (`readOnlyHint`, `destructiveHint`) so clients can treat edits and deletes with more care.
+
+For editing existing posts, a good setup is a staff token for an Editor user plus `GHOST_MCP_TOOLS=posts_browse,posts_read,posts_edit`.
 
 ## Available Resources
 
@@ -160,7 +195,7 @@ npm install
 npm test
 ```
 
-`npm test` builds the server and runs end-to-end tests in `test/` against a mock Ghost Admin API.
+`npm test` builds the server and runs end-to-end tests in `test/` against a mock Ghost Admin API. `npm run pack:mcpb` builds the Claude Desktop extension in `dist/`; keep the `version` in `manifest.json` in step with `package.json`.
 
 ## Contributing
 

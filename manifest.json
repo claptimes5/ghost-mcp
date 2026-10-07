@@ -1,0 +1,79 @@
+{
+  "manifest_version": "0.3",
+  "name": "ghost-mcp",
+  "display_name": "Ghost",
+  "version": "0.2.0",
+  "description": "Manage a Ghost site's posts, members, tags, tiers, offers and newsletters, with guardrails on what the AI can change.",
+  "author": {
+    "name": "Fanyang Meng and contributors"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/claptimes5/ghost-mcp"
+  },
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "build/server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/build/server.js"
+      ],
+      "env": {
+        "GHOST_API_URL": "${user_config.ghost_api_url}",
+        "GHOST_ADMIN_API_KEY": "${user_config.ghost_admin_api_key}",
+        "GHOST_API_VERSION": "${user_config.ghost_api_version}",
+        "GHOST_MCP_READ_ONLY": "${user_config.read_only}",
+        "GHOST_MCP_TOOLS": "${user_config.tools}",
+        "GHOST_MCP_ALLOW": "${user_config.allow}"
+      }
+    }
+  },
+  "user_config": {
+    "ghost_api_url": {
+      "type": "string",
+      "title": "Ghost site URL",
+      "description": "Your site's URL with no trailing slash, e.g. https://yourblog.com",
+      "required": true
+    },
+    "ghost_admin_api_key": {
+      "type": "string",
+      "title": "Staff access token or Admin API key",
+      "description": "A staff access token from a limited-role staff user is safer: Ghost then enforces that role's permissions. An Admin API key has full admin rights.",
+      "sensitive": true,
+      "required": true
+    },
+    "ghost_api_version": {
+      "type": "string",
+      "title": "Ghost API version",
+      "default": "v5.0",
+      "required": false,
+      "description": "Accept-Version sent to Ghost, e.g. v5.0"
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only mode",
+      "description": "Only allow browsing and reading. Turn off to let the AI make changes.",
+      "default": true,
+      "required": false
+    },
+    "tools": {
+      "type": "string",
+      "title": "Allowed tools",
+      "description": "Optional comma-separated allowlist, e.g. posts_browse,posts_read,posts_edit. Leave empty for all tools.",
+      "required": false
+    },
+    "allow": {
+      "type": "string",
+      "title": "High-risk capabilities",
+      "description": "Optional comma-separated opt-ins: publish, webhooks, code_injection, privileged_invites, staff_email.",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

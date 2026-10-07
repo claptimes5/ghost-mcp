@@ -44,7 +44,13 @@ const authorRef = z.union([
 const postMutableFields = {
   html: z.string().optional(),
   lexical: z.string().optional(),
-  status: z.string().optional(),
+  // Publishing makes content public (and is a way to leak data), so it's opt-in.
+  status: isAllowed("publish")
+    ? z.enum(["draft", "published", "scheduled"]).optional()
+    : z
+        .literal("draft")
+        .optional()
+        .describe("Only draft is allowed; publish from Ghost Admin. Edits to already-published posts go live immediately."),
   slug: z.string().optional(),
   visibility: z.string().optional(),
   featured: z.boolean().optional(),

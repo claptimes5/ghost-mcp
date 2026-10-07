@@ -3,6 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerResources } from './resources';
+import { warnOnRiskyCombination } from './toolPolicy';
 import { registerPrompts } from "./prompts";
 import { registerPostTools } from "./tools/posts";
 import { registerMemberTools } from "./tools/members";
@@ -44,6 +45,7 @@ registerRoleTools(server);
 registerWebhookTools(server);
 
 registerPrompts(server);
+warnOnRiskyCombination();
 
 // Set up and connect to the standard I/O transport
 async function startServer() {

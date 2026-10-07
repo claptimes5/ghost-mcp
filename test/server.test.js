@@ -6,6 +6,7 @@ const path = require('node:path');
 const jwt = require('jsonwebtoken');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const { ElicitRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const KEY_ID = '0123456789abcdef01234567';
 const SECRET = 'ab'.repeat(32);
@@ -54,20 +55,23 @@ const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', ()
 before(async () => { ghostUrl = await listen(ghost); });
 after(() => ghost.close());
 
-async function connect(env = {}) {
+// env: server environment. elicit: optional handler; when given, the client advertises elicitation.
+async function connect(env = {}, { elicit, stderr } = {}) {
     const transport = new StdioClientTransport({
         command: process.execPath,
         args: [SERVER],
         env: { PATH: process.env.PATH, GHOST_API_URL: ghostUrl, GHOST_ADMIN_API_KEY: `${KEY_ID}:${SECRET}`, ...env },
-        stderr: 'ignore',
+        stderr: stderr ? 'pipe' : 'ignore',
     });
-    const client = new Client({ name: 'test', version: '1.0.0' });
+    if (stderr) transport.stderr.on('data', chunk => stderr.push(String(chunk)));
+    const client = new Client({ name: 'test', version: '1.0.0' }, { capabilities: elicit ? { elicitation: {} } : {} });
+    if (elicit) client.setRequestHandler(ElicitRequestSchema, elicit);
     await client.connect(transport);
     return client;
 }
 
-async function withClient(env, fn) {
-    const client = await connect(env);
+async function withClient(env, fn, options) {
+    const client = await connect(env, options);
     try { return await fn(client); } finally { await client.close(); }
 }
 
@@ -206,4 +210,72 @@ describe('posts, resources and prompts', () => {
         const prompt = await client.getPrompt({ name: 'summarize-post', arguments: { postId: 'p1' } });
         assert.match(prompt.messages[0].content.text, /<p>Body<\/p>/);
     }));
+});
+
+describe('confirmation for deletes', () => {
+    test('a declined confirmation cancels the delete', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'posts_delete', { id: 'p1' });
+        assert.equal(result.isError, true);
+        assert.match(result.content[0].text, /cancelled by the user/);
+        assert.ok(!requests.some(r => r.method === 'DELETE'));
+    }, { elicit: async () => ({ action: 'decline' }) }));
+
+    test('accepting without ticking confirm also cancels', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'posts_delete', { id: 'p1' });
+        assert.equal(result.isError, true);
+        assert.ok(!requests.some(r => r.method === 'DELETE'));
+    }, { elicit: async () => ({ action: 'accept', content: { confirm: false } }) }));
+
+    test('a confirmed delete goes through', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'posts_delete', { id: 'p1' });
+        assert.equal(result.isError, undefined);
+        assert.ok(requests.some(r => r.method === 'DELETE' && r.path === '/ghost/api/admin/posts/p1/'));
+    }, { elicit: async request => {
+        assert.match(request.params.message, /Permanently delete post p1/);
+        return { action: 'accept', content: { confirm: true } };
+    } }));
+});
+
+describe('publishing', () => {
+    test('posts can only be saved as drafts by default', () => withClient({}, async client => {
+        requests = [];
+        const result = await call(client, 'posts_add', { title: 'T', status: 'published' });
+        assert.equal(result.isError, true);
+        assert.ok(!requests.some(r => r.method === 'POST'));
+        assert.equal((await call(client, 'posts_add', { title: 'T', status: 'draft' })).isError, undefined);
+    }));
+
+    test('publish allows publishing', () => withClient({ GHOST_MCP_ALLOW: 'publish' }, async client => {
+        const result = await call(client, 'posts_edit', { id: 'p1', updated_at: 'u1', status: 'published' });
+        assert.equal(result.isError, undefined);
+    }));
+});
+
+describe('configuration', () => {
+    test('GHOST_ADMIN_API_KEY_COMMAND supplies the key', () => withClient(
+        { GHOST_ADMIN_API_KEY: '', GHOST_ADMIN_API_KEY_COMMAND: `echo ${KEY_ID}:${SECRET}` },
+        async client => assert.equal((await call(client, 'tiers_browse', {})).isError, undefined)
+    ));
+
+    test('a failing key command stops the server', async () => {
+        await assert.rejects(connect({ GHOST_ADMIN_API_KEY: '', GHOST_ADMIN_API_KEY_COMMAND: 'exit 1' }));
+    });
+
+    test('unfilled .mcpb placeholders are treated as unset', () => withClient(
+        { GHOST_MCP_TOOLS: '${user_config.tools}', GHOST_MCP_READ_ONLY: '${user_config.read_only}' },
+        async client => assert.equal((await toolNames(client)).length, 37)
+    ));
+
+    test('warns when member data and public writes are both enabled', async () => {
+        const stderr = [];
+        await withClient({}, async () => {}, { stderr });
+        assert.match(stderr.join(''), /member data .* could leak/);
+
+        const quiet = [];
+        await withClient({ GHOST_MCP_TOOLS: 'posts_read,posts_edit' }, async () => {}, { stderr: quiet });
+        assert.doesNotMatch(quiet.join(''), /Warning/);
+    });
 });
