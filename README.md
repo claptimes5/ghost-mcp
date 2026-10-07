@@ -22,6 +22,27 @@ A Ghost Admin API key from a custom integration has full administrator rights, s
 
 The guardrails below still apply on top of the role, but the role is what Ghost itself enforces.
 
+#### Store the token
+
+Keep the token in a password manager rather than in an MCP config file. On Linux or WSL, [`pass`](https://www.passwordstore.org/) works well:
+
+```bash
+sudo apt install pass
+gpg --quick-generate-key "Your Name <you@example.com>"
+pass init you@example.com
+pass insert ghost/staff-token
+```
+
+`gpg --quick-generate-key` asks for a passphrase to protect the store, and `pass insert` asks you to paste the token. Skip this if you already use `pass` or another password manager with a command-line tool.
+
+MCP clients start the server in the background, where there's no terminal to type a passphrase into. Unless your system has a graphical passphrase prompt, the server can only fetch the token while GPG has your passphrase cached, so unlock the store before starting your client:
+
+```bash
+pass show ghost/staff-token > /dev/null
+```
+
+GPG forgets the passphrase after 10 minutes by default; the server only needs it at startup. If your client restarts the server later, it fails with `GHOST_ADMIN_API_KEY_COMMAND failed` until you unlock the store again. To keep the passphrase cached longer, set `default-cache-ttl` and `max-cache-ttl` (in seconds) in `~/.gnupg/gpg-agent.conf`.
+
 ### 2. Install the server
 
 Build it from a local clone of this repository:
@@ -50,6 +71,12 @@ claude mcp add ghost --scope user \
 
 `GHOST_ADMIN_API_KEY_COMMAND` runs through your shell, so any secret store with a CLI works, for example `op read "op://Private/Ghost/credential"` (1Password), `security find-generic-password -s ghost-mcp -w` (macOS Keychain) or `secret-tool lookup service ghost-mcp` (GNOME Keyring).
 
+Check that it connected:
+
+```bash
+claude mcp list
+```
+
 **Other clients.** Add the server to the client's MCP config, for example:
 ```json
 {
@@ -68,6 +95,10 @@ claude mcp add ghost --scope user \
 ```
 
 `GHOST_ADMIN_API_KEY` can hold the token directly instead, but then it sits in plain text in that file. `GHOST_API_VERSION` defaults to `v5.0`.
+
+### 4. Try it read-only first
+
+Before letting the AI change anything, ask it something that only reads, such as "list my five most recent posts". If that works, your URL, token and role are set up correctly. Then try an edit on a draft before a published post: edits to a published post go live immediately.
 
 ## Security
 
