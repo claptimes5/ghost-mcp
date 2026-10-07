@@ -8,7 +8,8 @@ const env = (name: string): string | undefined => {
 };
 
 // Read configuration values directly from process.env
-export const GHOST_API_URL: string = env('GHOST_API_URL') as string;
+// The admin client rejects a trailing slash ("https://site.com/blog/" is a common paste).
+export const GHOST_API_URL: string = env('GHOST_API_URL')?.replace(/\/+$/, '') as string;
 export const GHOST_API_VERSION: string = env('GHOST_API_VERSION') || 'v5.0'; // Default to v5.0
 
 // The key can be given directly, or fetched from a password manager or keychain with a
